@@ -71,6 +71,9 @@
 #include <QMap>
 #include <QDomDocument>
 #include <QCoreApplication>
+#include <QFile>
+#include <QString>
+#include <QIODevice>
 
 #include "ConsoleBatch.h"
 #include "CommandLine.h"
@@ -86,39 +89,6 @@ ConsoleBatch::ConsoleBatch(std::vector<ImageFileInfo> const& images, QString con
 
     m_ptrThumbnailCache = Utils::createThumbnailCache(output_directory, m_pAccelerationProvider->getOperations());
     m_outFileNameGen = OutputFileNameGenerator(m_ptrDisambiguator, output_directory, m_ptrPages->layoutDirection());
-}
-
-ConsoleBatch::ConsoleBatch(QString const& project_file, QString const& output_directory)
-    :   batch(true), debug(true),
-        m_pAccelerationProvider(new DefaultAccelerationProvider(QCoreApplication::instance())),
-        m_ptrDisambiguator(new FileNameDisambiguator)
-{
-    QDomDocument doc;
-    QFile file(project_file);
-    if (!file.open(QIODevice::ReadOnly) || !doc.setContent(&file))
-    {
-        throw std::runtime_error("Unable to process the project file.");
-    }
-
-    file.close();
-
-    ProjectReader reader(doc);
-    m_ptrPages = reader.pages();
-
-    PageSelectionAccessor const accessor((IntrusivePtr<PageSelectionProvider>())); // Won't really be used anyway.
-    m_ptrStages = IntrusivePtr<StageSequence>(new StageSequence(m_ptrPages, accessor));
-    reader.readFilterSettings(m_ptrStages->filters());
-
-    m_ptrThumbnailCache = Utils::createThumbnailCache(output_directory, m_pAccelerationProvider->getOperations());
-
-    if (!output_directory.isEmpty())
-    {
-        m_outFileNameGen = OutputFileNameGenerator(m_ptrDisambiguator, output_directory, m_ptrPages->layoutDirection());
-    }
-    else
-    {
-        m_outFileNameGen = OutputFileNameGenerator(m_ptrDisambiguator, reader.outputDirectory(), m_ptrPages->layoutDirection());
-    }
 }
 
 ConsoleBatch::ConsoleBatch(QString const project_file)
