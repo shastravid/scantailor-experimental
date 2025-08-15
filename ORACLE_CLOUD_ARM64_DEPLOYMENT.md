@@ -25,7 +25,7 @@ Oracle Cloud offers generous free tier ARM instances:
 
 ```bash
 # Clone the repository
-git clone https://github.com/4lex4/scantailor-experimental.git
+git clone https://github.com/shastravid/scantailor-experimental.git
 cd scantailor-experimental
 
 # Run the optimized ARM64 build script
@@ -305,9 +305,9 @@ done
 - [Oracle Cloud Monitoring](https://docs.oracle.com/en-us/iaas/Content/Monitoring/home.htm)
 
 ### ScanTailor Resources
-- [ScanTailor Experimental GitHub](https://github.com/4lex4/scantailor-experimental)
-- [Documentation](https://github.com/4lex4/scantailor-experimental/wiki)
-- [Issue Tracker](https://github.com/4lex4/scantailor-experimental/issues)
+- [ScanTailor Experimental GitHub](https://github.com/shastravid/scantailor-experimental)
+- [Documentation](https://github.com/shastravid/scantailor-experimental/wiki)
+- [Issue Tracker](https://github.com/shastravid/scantailor-experimental/issues)
 
 ### Performance Tuning
 - ARM64 optimization guides
