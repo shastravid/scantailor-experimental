@@ -43,13 +43,15 @@ apt-get install -y \
     linux-tools-common \
     linux-tools-generic
 
-# Optimize CPU governor for performance
-echo "⚡ Setting CPU governor to performance mode..."
-echo 'performance' | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor > /dev/null
-
-# Make CPU governor setting persistent
-echo "📝 Making CPU governor persistent..."
-cat > /etc/systemd/system/cpu-performance.service << EOF
+# Optimize CPU governor for performance (if available)
+echo "⚡ Checking CPU frequency scaling support..."
+if [ -d "/sys/devices/system/cpu/cpu0/cpufreq" ]; then
+    echo "Setting CPU governor to performance mode..."
+    echo 'performance' | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor > /dev/null
+    
+    # Make CPU governor setting persistent
+    echo "📝 Making CPU governor persistent..."
+    cat > /etc/systemd/system/cpu-performance.service << EOF
 [Unit]
 Description=Set CPU governor to performance
 After=multi-user.target
@@ -62,9 +64,13 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 EOF
-
-systemctl enable cpu-performance.service
-systemctl start cpu-performance.service
+    
+    systemctl enable cpu-performance.service
+    systemctl start cpu-performance.service
+else
+    echo "CPU frequency scaling not available (expected on Oracle Cloud ARM64 instances)"
+    echo "Processors run at fixed frequency - no governor configuration needed"
+fi
 
 # Optimize memory settings
 echo "🧠 Optimizing memory settings..."
@@ -150,7 +156,11 @@ cat > /usr/local/bin/verify-optimizations << 'EOF'
 echo "🔍 Verifying ARM64 optimizations..."
 echo ""
 echo "CPU Governor:"
-cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+if [ -f "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor" ]; then
+    cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+else
+    echo "Not available (fixed frequency processor)"
+fi
 echo ""
 echo "Swappiness:"
 cat /proc/sys/vm/swappiness
