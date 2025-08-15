@@ -1,0 +1,61 @@
+--- a/src/ConsoleBatch.cpp
++++ b/src/ConsoleBatch.cpp
+@@ -78,7 +78,12 @@
+ ConsoleBatch::ConsoleBatch(std::vector<ImageFileInfo> const& images, QString const& output_directory, Qt::LayoutDirection const layout)
+     :   batch(true), debug(true),
+-        m_pAccelerationProvider(new DefaultAccelerationProvider(QCoreApplication::instance())),
++        m_pAccelerationProvider(nullptr),
+         m_ptrDisambiguator(new FileNameDisambiguator),
+         m_ptrPages(new ProjectPages(images, ProjectPages::AUTO_PAGES, layout))
+ {
++    try {
++        m_pAccelerationProvider = new DefaultAccelerationProvider(QCoreApplication::instance());
++    } catch (...) {
++        std::cerr << "Warning: Failed to initialize acceleration provider, continuing without acceleration." << std::endl;
++    }
++    
+     PageSelectionAccessor const accessor((IntrusivePtr<PageSelectionProvider>())); // Won't really be used anyway.
+     m_ptrStages = IntrusivePtr<StageSequence>(new StageSequence(m_ptrPages, accessor));
+ 
+@@ -86,7 +91,11 @@
+     // Create thumbnail cache with null pointer check
+     std::shared_ptr<AcceleratableOperations> accel_ops;
+     if (m_pAccelerationProvider) {
+-        accel_ops = m_pAccelerationProvider->getOperations();
++        try {
++            accel_ops = m_pAccelerationProvider->getOperations();
++        } catch (...) {
++            std::cerr << "Warning: Failed to get acceleration operations, using non-accelerated mode." << std::endl;
++        }
+     }
+     m_ptrThumbnailCache = Utils::createThumbnailCache(output_directory, accel_ops);
+     m_outFileNameGen = OutputFileNameGenerator(m_ptrDisambiguator, output_directory, m_ptrPages->layoutDirection());
+@@ -95,7 +104,12 @@
+ ConsoleBatch::ConsoleBatch(QString const& project_file)
+     :   batch(true), debug(true),
+-        m_pAccelerationProvider(new DefaultAccelerationProvider(QCoreApplication::instance()))
++        m_pAccelerationProvider(nullptr)
+ {
++    try {
++        m_pAccelerationProvider = new DefaultAccelerationProvider(QCoreApplication::instance());
++    } catch (...) {
++        std::cerr << "Warning: Failed to initialize acceleration provider, continuing without acceleration." << std::endl;
++    }
++    
+     QFile file(project_file);
+     if (!file.open(QIODevice::ReadOnly))
+@@ -125,7 +139,13 @@
+     }
+ 
+-    m_ptrThumbnailCache = Utils::createThumbnailCache(output_directory, m_pAccelerationProvider->getOperations());
++    std::shared_ptr<AcceleratableOperations> accel_ops;
++    if (m_pAccelerationProvider) {
++        try {
++            accel_ops = m_pAccelerationProvider->getOperations();
++        } catch (...) {
++            std::cerr << "Warning: Failed to get acceleration operations, using non-accelerated mode." << std::endl;
++        }
++    }
++    m_ptrThumbnailCache = Utils::createThumbnailCache(output_directory, accel_ops);
+     m_outFileNameGen = OutputFileNameGenerator(m_ptrDisambiguator, output_directory, m_ptrPages->layoutDirection());
+ }

@@ -1,0 +1,103 @@
+# Multi-stage Dockerfile for ARM64 Ubuntu 22.04 Server
+# Optimized for Oracle Cloud VPS deployment
+
+# Build stage
+FROM ubuntu:22.04 as builder
+
+# Set environment variables for non-interactive installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    ninja-build \
+    qt6-base-dev \
+    qt6-tools-dev \
+    qt6-base-dev-tools \
+    libtiff-dev \
+    libjpeg-dev \
+    libpng-dev \
+    zlib1g-dev \
+    libeigen3-dev \
+    pkg-config \
+    libboost-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# Copy source code
+COPY . .
+
+# Create build directory and configure
+RUN mkdir -p build-arm64 && cd build-arm64 && \
+    cmake .. \
+    -GNinja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_FLAGS="-march=armv8-a -mtune=cortex-a72 -O3 -DNDEBUG -ffast-math -funroll-loops -fomit-frame-pointer" \
+    -DCMAKE_CXX_FLAGS="-march=armv8-a -mtune=cortex-a72 -O3 -DNDEBUG -ffast-math -funroll-loops -fomit-frame-pointer -std=c++17" \
+    -DENABLE_OPENCL=OFF \
+    -DENABLE_OPENGL=OFF \
+    -DBUILD_CRASH_REPORTER=OFF \
+    -DCMAKE_SKIP_RPATH=ON \
+    -DBUILD_TESTING=OFF \
+    -DQT_NO_DEBUG_OUTPUT=ON \
+    -DQT_NO_WARNING_OUTPUT=ON
+
+# Build the application
+RUN cd build-arm64 && \
+    ninja -j$(nproc) && \
+    strip scantailor-experimental-cli
+
+# Runtime stage
+FROM ubuntu:22.04 as runtime
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y \
+    qt6-base-dev \
+    libtiff6 \
+    libjpeg8 \
+    libpng16-16 \
+    zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN useradd -m -u 1000 scantailor && \
+    mkdir -p /app /data && \
+    chown -R scantailor:scantailor /app /data
+
+# Copy the built binary
+COPY --from=builder /build/build-arm64/scantailor-experimental-cli /app/
+
+# Set permissions
+RUN chmod +x /app/scantailor-experimental-cli
+
+# Switch to non-root user
+USER scantailor
+
+# Set working directory
+WORKDIR /data
+
+# Add binary to PATH
+ENV PATH="/app:$PATH"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD scantailor-experimental-cli --help > /dev/null || exit 1
+
+# Default command
+CMD ["scantailor-experimental-cli", "--help"]
+
+# Labels for metadata
+LABEL maintainer="ScanTailor Community" \
+      description="ScanTailor Experimental CLI - ARM64 Ubuntu 22.04 Optimized" \
+      version="1.0" \
+      architecture="arm64" \
+      os="ubuntu:22.04"
