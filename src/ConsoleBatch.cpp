@@ -23,11 +23,12 @@
 #include <assert.h>
 
 
-#include <QtCore/QCoreApplication>
-#include <QtCore/QFile>
-#include <QtCore/QString>
-#include <QtCore/QIODevice>
-#include <QtXml/QDomDocument>
+#include <QCoreApplication>
+#include <QFile>
+#include <QString>
+#include <QIODevice>
+#include <QDomDocument>
+#include <QWidget>
 #include <QtCore/QMap>
 #include <QtCore/QFileInfo>
 #include <QtCore/QDir>
@@ -89,20 +90,20 @@
 #include "ConsoleBatch.h"
 #include "CommandLine.h"
 
-ConsoleBatch::ConsoleBatch(std::vector<ImageFileInfo> const& images, QString const& output_directory, Qt::LayoutDirection const layout)
+ConsoleBatch::ConsoleBatch(std::vector<ImageFileInfo> const& images, QString const& output_directory, ::Qt::LayoutDirection const layout)
     :   batch(true), debug(true),
         m_pAccelerationProvider(nullptr),
         m_ptrDisambiguator(new FileNameDisambiguator()),
-        m_ptrPages(new ProjectPages(images, ProjectPages::ONE_PAGE, layout))
+        m_ptrPages(new ProjectPages(images, ProjectPages::AUTO_PAGES, layout))
 {
     try {
-        m_pAccelerationProvider = new DefaultAccelerationProvider(QCoreApplication::instance());
+        m_pAccelerationProvider = new DefaultAccelerationProvider(::QCoreApplication::instance());
     } catch (...) {
         std::cerr << "Warning: Failed to initialize acceleration provider, continuing without acceleration." << std::endl;
     }
     
-    PageSelectionAccessor const accessor((IntrusivePtr<PageSelectionProvider>())); // Won't really be used anyway.
-    m_ptrStages = IntrusivePtr<StageSequence>(new StageSequence(m_ptrPages, accessor));
+    PageSelectionAccessor const accessor((::IntrusivePtr<PageSelectionProvider>())); // Won't really be used anyway.
+    m_ptrStages = ::IntrusivePtr<StageSequence>(new StageSequence(m_ptrPages, accessor));
 
     std::shared_ptr<AcceleratableOperations> accel_ops;
     if (m_pAccelerationProvider) {
@@ -116,23 +117,23 @@ ConsoleBatch::ConsoleBatch(std::vector<ImageFileInfo> const& images, QString con
     m_outFileNameGen = OutputFileNameGenerator(m_ptrDisambiguator, output_directory, m_ptrPages->layoutDirection());
 }
 
-ConsoleBatch::ConsoleBatch(QString const project_file)
+ConsoleBatch::ConsoleBatch(::QString const project_file)
     :   batch(true), debug(true),
         m_pAccelerationProvider(nullptr)
 {
     try {
-        m_pAccelerationProvider = new DefaultAccelerationProvider(QCoreApplication::instance());
+        m_pAccelerationProvider = new DefaultAccelerationProvider(::QCoreApplication::instance());
     } catch (...) {
         std::cerr << "Warning: Failed to initialize acceleration provider, continuing without acceleration." << std::endl;
     }
     
-    QFile file(project_file);
-    if (!file.open(QIODevice::ReadOnly))
+    ::QFile file(project_file);
+    if (!file.open(::QIODevice::ReadOnly))
     {
         throw std::runtime_error("Unable to open the project file.");
     }
 
-    QDomDocument doc;
+    ::QDomDocument doc;
     if (!doc.setContent(&file))
     {
         throw std::runtime_error("The project file is broken.");
@@ -143,14 +144,14 @@ ConsoleBatch::ConsoleBatch(QString const project_file)
     m_ptrReader.reset(new ProjectReader(doc));
     m_ptrPages = m_ptrReader->pages();
 
-    PageSelectionAccessor const accessor((IntrusivePtr<PageSelectionProvider>())); // Won't be used anyway.
+    PageSelectionAccessor const accessor((::IntrusivePtr<PageSelectionProvider>())); // Won't be used anyway.
     m_ptrDisambiguator = m_ptrReader->namingDisambiguator();
 
-    m_ptrStages = IntrusivePtr<StageSequence>(new StageSequence(m_ptrPages, accessor));
+    m_ptrStages = ::IntrusivePtr<StageSequence>(new StageSequence(m_ptrPages, accessor));
     m_ptrReader->readFilterSettings(m_ptrStages->filters());
 
     CommandLine const& cli = CommandLine::get();
-    QString output_directory = m_ptrReader->outputDirectory();
+    ::QString output_directory = m_ptrReader->outputDirectory();
     if (!cli.outputDirectory().isEmpty())
     {
         output_directory = cli.outputDirectory();
@@ -176,8 +177,8 @@ ConsoleBatch::createCompositeTask(
     PageInfo const& page,
     int const last_filter_idx)
 {
-    IntrusivePtr<fix_orientation::Task> fix_orientation_task;
-    IntrusivePtr<page_split::Task> page_split_task;
+    ::IntrusivePtr<fix_orientation::Task> fix_orientation_task;
+    ::IntrusivePtr<page_split::Task> page_split_task;
     IntrusivePtr<deskew::Task> deskew_task;
     IntrusivePtr<select_content::Task> select_content_task;
     IntrusivePtr<page_layout::Task> page_layout_task;
