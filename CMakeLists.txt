@@ -159,7 +159,33 @@ IF(WIN32)
     SET(STAGING_LIBS_DIR "${DEPS_BUILD_DIR}/staging/libs")
 ENDIF()
 
-FIND_PACKAGE(Eigen3 REQUIRED)
+# Find Eigen3 with better error handling
+FIND_PACKAGE(Eigen3 QUIET)
+IF(NOT Eigen3_FOUND)
+    # Try alternative paths for Eigen3
+    FIND_PATH(EIGEN3_INCLUDE_DIR
+        NAMES Eigen/Core
+        PATHS
+            /usr/include/eigen3
+            /usr/local/include/eigen3
+            /opt/homebrew/include/eigen3
+            ${CMAKE_PREFIX_PATH}/include/eigen3
+        DOC "Eigen3 include directory"
+    )
+    
+    IF(EIGEN3_INCLUDE_DIR)
+        SET(Eigen3_FOUND TRUE)
+        MESSAGE(STATUS "Found Eigen3 at: ${EIGEN3_INCLUDE_DIR}")
+    ELSE()
+        MESSAGE(FATAL_ERROR 
+            "Eigen3 not found! Please install it:\n"
+            "  Ubuntu/Debian: sudo apt-get install libeigen3-dev\n"
+            "  CentOS/RHEL: sudo yum install eigen3-devel\n"
+            "  macOS: brew install eigen\n"
+            "  Or run: ./install_ci_dependencies.sh")
+    ENDIF()
+ENDIF()
+
 INCLUDE_DIRECTORIES(SYSTEM ${EIGEN3_INCLUDE_DIR})
 add_compile_options(-DEIGEN_MPL2_ONLY)
 

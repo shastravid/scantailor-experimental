@@ -1,0 +1,434 @@
+# CMakeLists.txt - Ubuntu ARM64 Optimized Configuration
+# Specifically designed for Oracle Cloud VPS and ARM64 servers without GPU
+# Qt6 based, OpenGL/OpenCL disabled, maximum performance optimizations
+
+CMAKE_MINIMUM_REQUIRED(VERSION 3.16.0)
+
+# Project configuration
+PROJECT("ScanTailor Experimental" VERSION 1.0.0 LANGUAGES C CXX)
+
+# ARM64 Architecture Detection and Configuration
+IF(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+    SET(ST_ARCH "ARM")
+    MESSAGE(STATUS "ARM64 architecture detected: ${CMAKE_SYSTEM_PROCESSOR}")
+ELSE()
+    SET(ST_ARCH "X86")
+    MESSAGE(STATUS "Non-ARM architecture detected: ${CMAKE_SYSTEM_PROCESSOR}")
+ENDIF()
+
+# Calculate architecture bits
+MATH(EXPR ST_ARCH_BITS "${CMAKE_SIZEOF_VOID_P} * 8")
+MESSAGE(STATUS "Architecture: ${ST_ARCH} ${ST_ARCH_BITS}-bit")
+
+# CMake policies for modern compatibility
+CMAKE_POLICY(SET CMP0003 NEW)
+CMAKE_POLICY(SET CMP0048 NEW)
+IF(POLICY CMP0074)
+    CMAKE_POLICY(SET CMP0074 NEW)
+ENDIF()
+IF(POLICY CMP0077)
+    CMAKE_POLICY(SET CMP0077 NEW)
+ENDIF()
+
+# Build type configuration
+IF(NOT CMAKE_BUILD_TYPE)
+    SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+ENDIF()
+MESSAGE(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
+# Ubuntu ARM64 specific optimizations
+SET(CMAKE_C_STANDARD 11)
+SET(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(CMAKE_CXX_EXTENSIONS OFF)
+
+# Compiler detection and flags
+IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    # ARM64 optimized compiler flags
+    SET(ARM64_FLAGS "")
+    IF(ST_ARCH STREQUAL "ARM")
+        # Oracle Cloud Ampere Altra optimizations
+        SET(ARM64_FLAGS "-march=armv8.2-a -mtune=neoverse-n1")
+        MESSAGE(STATUS "ARM64 optimizations: ${ARM64_FLAGS}")
+    ENDIF()
+    
+    # Release optimizations
+    SET(CMAKE_C_FLAGS_RELEASE "${ARM64_FLAGS} -O3 -DNDEBUG -ffast-math -funroll-loops -fomit-frame-pointer -flto -pipe")
+    SET(CMAKE_CXX_FLAGS_RELEASE "${ARM64_FLAGS} -O3 -DNDEBUG -ffast-math -funroll-loops -fomit-frame-pointer -flto -pipe")
+    
+    # Linker optimizations
+    SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto -Wl,--gc-sections -Wl,--strip-all -Wl,--as-needed")
+    SET(CMAKE_SHARED_LINKER_FLAGS_RELEASE "-flto -Wl,--gc-sections -Wl,--as-needed")
+    
+    # Enable interprocedural optimization
+    SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+ENDIF()
+
+# Ubuntu ARM64 specific definitions
+ADD_DEFINITIONS(-DST_ARCH_ARM64)
+ADD_DEFINITIONS(-DST_NO_GPU)
+ADD_DEFINITIONS(-DST_CLI_ONLY)
+ADD_DEFINITIONS(-DQT_NO_DEBUG_OUTPUT)
+ADD_DEFINITIONS(-DQT_NO_WARNING_OUTPUT)
+
+# Disable features not needed for CLI
+OPTION(ENABLE_OPENGL "Enable OpenGL support" OFF)
+OPTION(ENABLE_OPENCL "Enable OpenCL support" OFF)
+OPTION(BUILD_CRASH_REPORTER "Build crash reporter" OFF)
+OPTION(BUILD_TESTING "Build tests" OFF)
+OPTION(ST_NO_TESTS "Disable all tests" ON)
+
+# Force disable GPU features for ARM64 server
+IF(ST_ARCH STREQUAL "ARM")
+    SET(ENABLE_OPENGL OFF CACHE BOOL "OpenGL disabled for ARM64" FORCE)
+    SET(ENABLE_OPENCL OFF CACHE BOOL "OpenCL disabled for ARM64" FORCE)
+    MESSAGE(STATUS "GPU features disabled for ARM64 server environment")
+ENDIF()
+
+# Qt6 Configuration for Ubuntu ARM64
+SET(QT_DEFAULT_MAJOR_VERSION 6)
+SET(QT_SELECT 6)
+
+# Find Qt6 with comprehensive component search
+FIND_PACKAGE(Qt6 6.2 REQUIRED COMPONENTS
+    Core
+    Gui
+    Widgets
+    Xml
+    Network
+    PrintSupport
+)
+
+IF(Qt6_FOUND)
+    MESSAGE(STATUS "Qt6 found: ${Qt6_VERSION}")
+    MESSAGE(STATUS "Qt6 Core: ${Qt6Core_VERSION}")
+    MESSAGE(STATUS "Qt6 installation: ${Qt6_DIR}")
+    
+    # Set Qt6 specific definitions
+    ADD_DEFINITIONS(-DQT_DISABLE_DEPRECATED_BEFORE=0x060000)
+    ADD_DEFINITIONS(-DQT_NO_KEYWORDS)
+    
+    # Qt6 libraries for linking
+    SET(QT_LIBRARIES
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+        Qt6::Xml
+        Qt6::Network
+        Qt6::PrintSupport
+    )
+ELSE()
+    MESSAGE(FATAL_ERROR "Qt6 not found! Please install qt6-base-dev and related packages.")
+ENDIF()
+
+# Find required libraries
+FIND_PACKAGE(PkgConfig REQUIRED)
+
+# Eigen3 for mathematical operations
+FIND_PACKAGE(Eigen3 REQUIRED)
+IF(Eigen3_FOUND)
+    MESSAGE(STATUS "Eigen3 found: ${Eigen3_VERSION}")
+    INCLUDE_DIRECTORIES(${EIGEN3_INCLUDE_DIR})
+ENDIF()
+
+# Image processing libraries
+FIND_PACKAGE(TIFF REQUIRED)
+FIND_PACKAGE(JPEG REQUIRED)
+FIND_PACKAGE(PNG REQUIRED)
+FIND_PACKAGE(ZLIB REQUIRED)
+
+# Boost libraries
+FIND_PACKAGE(Boost 1.71 REQUIRED COMPONENTS system filesystem)
+IF(Boost_FOUND)
+    MESSAGE(STATUS "Boost found: ${Boost_VERSION}")
+    INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
+ENDIF()
+
+# OpenMP for parallel processing
+FIND_PACKAGE(OpenMP)
+IF(OpenMP_CXX_FOUND)
+    MESSAGE(STATUS "OpenMP found: ${OpenMP_CXX_VERSION}")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+ENDIF()
+
+# Include directories
+INCLUDE_DIRECTORIES(
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/foundation
+    ${CMAKE_SOURCE_DIR}/src/math
+    ${CMAKE_SOURCE_DIR}/src/interaction
+    ${CMAKE_SOURCE_DIR}/src/zones
+    ${CMAKE_SOURCE_DIR}/src/spfit
+    ${CMAKE_SOURCE_DIR}/src/dewarping
+    ${CMAKE_SOURCE_DIR}/src/acceleration
+    ${CMAKE_BINARY_DIR}
+)
+
+# Version configuration
+CONFIGURE_FILE(
+    "${CMAKE_SOURCE_DIR}/version.h.in"
+    "${CMAKE_BINARY_DIR}/version.h"
+    @ONLY
+)
+
+# Source file collections
+SET(FOUNDATION_SOURCES
+    src/foundation/Span.cpp
+    src/foundation/VirtualFunction.cpp
+    src/foundation/ref_countable.cpp
+    src/foundation/intrusive_ptr.cpp
+    src/foundation/SafeDeletingQObjectPtr.cpp
+    src/foundation/ScopedIncDec.cpp
+    src/foundation/ScopedDecInc.cpp
+    src/foundation/Proximity.cpp
+    src/foundation/Property.cpp
+    src/foundation/PropertyFactory.cpp
+    src/foundation/PropertySet.cpp
+    src/foundation/PerformanceTimer.cpp
+    src/foundation/QtSignalForwarder.cpp
+    src/foundation/GridLineTraverser.cpp
+    src/foundation/StaticPool.cpp
+    src/foundation/DynamicPool.cpp
+    src/foundation/NumericTraits.cpp
+    src/foundation/VecNT.cpp
+    src/foundation/MatMNT.cpp
+    src/foundation/MatrixCalc.cpp
+    src/foundation/Polynomial.cpp
+    src/foundation/PolynomialLine.cpp
+    src/foundation/PolynomialSurface.cpp
+    src/foundation/FlagOps.cpp
+    src/foundation/AutoRemovingFile.cpp
+    src/foundation/SafeDeletingQObjectPtr.cpp
+)
+
+SET(MATH_SOURCES
+    src/math/QuadraticFunction.cpp
+    src/math/XSpline.cpp
+    src/math/spfit/ConstraintSet.cpp
+    src/math/spfit/SqDistApproximant.cpp
+    src/math/spfit/ModelShape.cpp
+    src/math/spfit/PolylineModelShape.cpp
+    src/math/spfit/LinearForceBalancer.cpp
+    src/math/spfit/OptimizationResult.cpp
+    src/math/spfit/Optimizer.cpp
+    src/math/spfit/SplineFitter.cpp
+    src/math/spfit/FrenetFrame.cpp
+)
+
+SET(IMAGEPROC_SOURCES
+    src/imageproc/Constants.cpp
+    src/imageproc/BinaryImage.cpp
+    src/imageproc/BinaryThreshold.cpp
+    src/imageproc/SlicedHistogram.cpp
+    src/imageproc/ByteOrder.cpp
+    src/imageproc/BackgroundColorCalculator.cpp
+    src/imageproc/PolygonUtils.cpp
+    src/imageproc/PolynomialLine.cpp
+    src/imageproc/PolynomialSurface.cpp
+    src/imageproc/SavGolFilter.cpp
+    src/imageproc/DrawOver.cpp
+    src/imageproc/AdjustBrightness.cpp
+    src/imageproc/SEDM.cpp
+    src/imageproc/ConnectivityMap.cpp
+    src/imageproc/InfluenceMap.cpp
+    src/imageproc/MaxWhitespaceFinder.cpp
+    src/imageproc/PolygonRasterizer.cpp
+    src/imageproc/RasterOp.cpp
+    src/imageproc/GrayImage.cpp
+    src/imageproc/Grayscale.cpp
+    src/imageproc/RgbToGray.cpp
+    src/imageproc/Morphology.cpp
+    src/imageproc/IntegralImage.cpp
+    src/imageproc/Binarize.cpp
+    src/imageproc/SkewFinder.cpp
+    src/imageproc/OrthogonalRotation.cpp
+    src/imageproc/Scale.cpp
+    src/imageproc/Transform.cpp
+    src/imageproc/Shear.cpp
+    src/imageproc/ReduceThreshold.cpp
+    src/imageproc/Sobel.cpp
+    src/imageproc/MorphGradientDetect.cpp
+    src/imageproc/PolygonalRegion.cpp
+    src/imageproc/SplineFitting.cpp
+    src/imageproc/LocalMinMaxGeneric.cpp
+    src/imageproc/SeedFill.cpp
+    src/imageproc/FindPeaksGeneric.cpp
+    src/imageproc/TaskStatus.cpp
+    src/imageproc/DebugImages.cpp
+    src/imageproc/BadAllocIfNull.cpp
+)
+
+# Main CLI sources
+SET(CLI_SOURCES
+    src/main-cli.cpp
+    src/ConsoleBatch.cpp
+    src/CommandLine.cpp
+    src/Application.cpp
+    src/ProjectReader.cpp
+    src/ProjectWriter.cpp
+    src/AtomicFileOverwriter.cpp
+    src/RelinkablePath.cpp
+    src/AbstractRelinker.cpp
+    src/FileNameDisambiguator.cpp
+    src/OutputFileNameGenerator.cpp
+    src/PageInfo.cpp
+    src/BackgroundTask.cpp
+    src/ProcessingTaskQueue.cpp
+    src/PageSequence.cpp
+    src/StageSequence.cpp
+    src/ProjectPages.cpp
+    src/PageSelectionAccessor.cpp
+    src/PageOrderProvider.cpp
+    src/PageOrderOption.cpp
+    src/PayloadEvent.cpp
+    src/FilterOptionsWidget.cpp
+    src/FilterUiInterface.cpp
+    src/ProjectFilesDialog.cpp
+    src/SkinnedButton.cpp
+    src/ProcessingIndicationWidget.cpp
+    src/ImageInfo.cpp
+    src/ImageFileInfo.cpp
+    src/ImageMetadata.cpp
+    src/RecentProjects.cpp
+    src/WorkerThread.cpp
+    src/LoadFileTask.cpp
+    src/FilterResult.cpp
+    src/AbstractFilter.cpp
+    src/BasicImageView.cpp
+    src/ImageViewBase.cpp
+    src/ImagePixmapUnion.cpp
+    src/PixmapRenderer.cpp
+    src/TabbedDebugImages.cpp
+    src/DebugImageView.cpp
+    src/ThumbnailPixmapCache.cpp
+    src/IncompleteThumbnail.cpp
+    src/ContentSpanFinder.cpp
+    src/PhysicalTransformation.cpp
+    src/ImageTransformation.cpp
+    src/ImageId.cpp
+    src/PageId.cpp
+    src/Dpi.cpp
+    src/Dpm.cpp
+    src/ImageMetadataLoader.cpp
+    src/TiffReader.cpp
+    src/TiffWriter.cpp
+    src/TiffMetadataLoader.cpp
+    src/JpegMetadataLoader.cpp
+    src/ImageLoader.cpp
+    src/ErrorWidget.cpp
+    src/OrientationApplicator.cpp
+    src/Utils.cpp
+    src/SmartFilenameOrdering.cpp
+    src/AbstractCommand.cpp
+    src/AbstractFilterDataCollector.cpp
+    src/ThumbnailCollector.cpp
+    src/ContentBoxCollector.cpp
+    src/PageOrientationCollector.cpp
+    src/DefaultParams.cpp
+    src/DefaultParamsProvider.cpp
+    src/LoadFilesStatusDialog.cpp
+    src/ProjectCreationContext.cpp
+    src/ProjectOpeningContext.cpp
+    src/FixDpiDialog.cpp
+    src/LoadFileTask.cpp
+    src/FilterOptionsWidget.cpp
+    src/FilterUiInterface.cpp
+    src/StatusBarProvider.cpp
+    src/UnitsProvider.cpp
+    src/UnitsConverter.cpp
+    src/UnitsObserver.cpp
+    src/ColorSchemeManager.cpp
+    src/ColorScheme.cpp
+    src/DarkScheme.cpp
+    src/LightScheme.cpp
+    src/NativeScheme.cpp
+)
+
+# Stage-specific sources
+FILE(GLOB_RECURSE STAGE_SOURCES
+    "src/stages/fix_orientation/*.cpp"
+    "src/stages/page_split/*.cpp"
+    "src/stages/deskew/*.cpp"
+    "src/stages/select_content/*.cpp"
+    "src/stages/page_layout/*.cpp"
+    "src/stages/output/*.cpp"
+)
+
+# Acceleration sources (CPU-only for ARM64)
+SET(ACCELERATION_SOURCES
+    src/acceleration/AcceleratableOperations.cpp
+    src/acceleration/AccelerationProvider.cpp
+)
+
+# Create the main executable
+ADD_EXECUTABLE(scantailor-experimental-cli
+    ${CLI_SOURCES}
+    ${FOUNDATION_SOURCES}
+    ${MATH_SOURCES}
+    ${IMAGEPROC_SOURCES}
+    ${STAGE_SOURCES}
+    ${ACCELERATION_SOURCES}
+)
+
+# Link libraries
+TARGET_LINK_LIBRARIES(scantailor-experimental-cli
+    ${QT_LIBRARIES}
+    ${Boost_LIBRARIES}
+    ${TIFF_LIBRARIES}
+    ${JPEG_LIBRARIES}
+    ${PNG_LIBRARIES}
+    ${ZLIB_LIBRARIES}
+    pthread
+    m
+)
+
+# Link OpenMP if available
+IF(OpenMP_CXX_FOUND)
+    TARGET_LINK_LIBRARIES(scantailor-experimental-cli OpenMP::OpenMP_CXX)
+ENDIF()
+
+# Set target properties
+SET_TARGET_PROPERTIES(scantailor-experimental-cli PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
+# Installation configuration
+INSTALL(TARGETS scantailor-experimental-cli
+    RUNTIME DESTINATION bin
+    COMPONENT Runtime
+)
+
+# CPack configuration for distribution
+SET(CPACK_PACKAGE_NAME "scantailor-experimental-cli")
+SET(CPACK_PACKAGE_VERSION "1.0.0")
+SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "ScanTailor CLI - Ubuntu ARM64 Optimized")
+SET(CPACK_PACKAGE_VENDOR "ScanTailor Community")
+SET(CPACK_PACKAGE_CONTACT "community@scantailor.org")
+SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6core6, libqt6gui6, libqt6widgets6, libqt6xml6, libtiff6, libjpeg8, libpng16-16, zlib1g, libboost-system1.74.0, libboost-filesystem1.74.0")
+SET(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "arm64")
+SET(CPACK_DEBIAN_PACKAGE_SECTION "graphics")
+SET(CPACK_GENERATOR "DEB;TGZ")
+
+INCLUDE(CPack)
+
+# Display configuration summary
+MESSAGE(STATUS "")
+MESSAGE(STATUS "=== Ubuntu ARM64 Configuration Summary ===")
+MESSAGE(STATUS "Architecture: ${ST_ARCH} ${ST_ARCH_BITS}-bit")
+MESSAGE(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
+MESSAGE(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
+MESSAGE(STATUS "Qt Version: ${Qt6_VERSION}")
+MESSAGE(STATUS "Boost Version: ${Boost_VERSION}")
+MESSAGE(STATUS "Eigen3 Version: ${Eigen3_VERSION}")
+MESSAGE(STATUS "OpenGL: ${ENABLE_OPENGL}")
+MESSAGE(STATUS "OpenCL: ${ENABLE_OPENCL}")
+MESSAGE(STATUS "OpenMP: ${OpenMP_CXX_FOUND}")
+MESSAGE(STATUS "Crash Reporter: ${BUILD_CRASH_REPORTER}")
+MESSAGE(STATUS "Testing: ${BUILD_TESTING}")
+MESSAGE(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+MESSAGE(STATUS "Install Prefix: ${CMAKE_INSTALL_PREFIX}")
+MESSAGE(STATUS "=========================================")
+MESSAGE(STATUS "")
