@@ -104,11 +104,19 @@ ConsoleBatch::ConsoleBatch(std::vector<ImageFileInfo> const& images, QString con
     PageSelectionAccessor const accessor((IntrusivePtr<PageSelectionProvider>())); // Won't really be used anyway.
     m_ptrStages = IntrusivePtr<StageSequence>(new StageSequence(m_ptrPages, accessor));
 
-    m_ptrThumbnailCache = Utils::createThumbnailCache(output_directory);
+    std::shared_ptr<AcceleratableOperations> accel_ops;
+    if (m_pAccelerationProvider) {
+        try {
+            accel_ops = m_pAccelerationProvider->getOperations();
+        } catch (...) {
+            std::cerr << "Warning: Failed to get acceleration operations, using non-accelerated mode." << std::endl;
+        }
+    }
+    m_ptrThumbnailCache = Utils::createThumbnailCache(output_directory, accel_ops);
     m_outFileNameGen = OutputFileNameGenerator(m_ptrDisambiguator, output_directory, m_ptrPages->layoutDirection());
 }
 
-ConsoleBatch::ConsoleBatch(QString const& project_file)
+ConsoleBatch::ConsoleBatch(QString const project_file)
     :   batch(true), debug(true),
         m_pAccelerationProvider(nullptr)
 {
@@ -158,7 +166,7 @@ ConsoleBatch::ConsoleBatch(QString const& project_file)
             std::cerr << "Warning: Failed to get acceleration operations, using non-accelerated mode." << std::endl;
         }
     }
-    m_ptrThumbnailCache = Utils::createThumbnailCache(output_directory);
+    m_ptrThumbnailCache = Utils::createThumbnailCache(output_directory, accel_ops);
     m_outFileNameGen = OutputFileNameGenerator(m_ptrDisambiguator, output_directory, m_ptrPages->layoutDirection());
 }
 
